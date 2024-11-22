@@ -1,0 +1,83 @@
+import java.io.*;
+import java.math.BigInteger;
+import java.nio.file.*;
+import java.security.*;
+import java.util.*;
+
+import org.json.simple.*;
+import org.json.simple.parser.*;
+
+public class DestinationHashGenerator {
+    public static void main(String args) {
+        StringTokenizer tkn = new StringTokenizer(args);
+        int ct = tkn.countTokens();
+        if (ct != 2) {
+            System.out.println("Usage: java -jar DestinationHashGenerator.jar <rollNumber> <filePath>");
+            return;
+        }
+        String rollNumber = tkn.nextToken();
+        String filePath = tkn.nextToken();
+        try {
+            String destinationValue = getDestinationValueFromJson(filePath);
+            if (destinationValue == null) {
+                System.out.println("Key 'destination' not found in the JSON file.");
+                return;
+            }
+
+            String randomString = generateRandomString(8);
+            String concatenatedString = rollNumber + destinationValue + randomString;
+            String md5Hash = generateMD5Hash(concatenatedString);
+
+            String output = md5Hash + ";" + randomString;
+            System.out.println(output);
+
+        } catch (IOException | ParseException | NoSuchAlgorithmException e) {
+            System.err.println("An error occurred: " + e.getMessage());
+        }
+    }
+
+    private static String getDestinationValueFromJson(String filePath) throws IOException, ParseException {
+        JSONParser parser = new JSONParser();
+        Object obj = parser.parse(new FileReader(filePath));
+
+        JSONObject jsonObject = (JSONObject) obj;
+
+        return findDestinationValue(jsonObject);
+    }
+
+    private static String findDestinationValue(JSONObject jsonObject) {
+        for (Object key : jsonObject.keySet()) {
+            Object value = jsonObject.get(key);
+            if (key.equals("destination")) {
+                return value.toString();
+            } else if (value instanceof JSONObject) {
+                String destination = findDestinationValue((JSONObject) value);
+                if (destination != null) {
+                    return destination;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String generateRandomString(int length) {
+        String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        Random random = new Random();
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(characters.charAt(random.nextInt(characters.length())));
+        }
+        return sb.toString();
+    }
+
+    private static String generateMD5Hash(String input) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance("MD5");
+        byte[] messageDigest = md.digest(input.getBytes());
+        BigInteger no = new BigInteger(1, messageDigest);
+        String hashtext = no.toString(16);
+        while (hashtext.length() < 32) {
+            hashtext = "0" + hashtext;
+        }
+        return hashtext;
+    }
+}
